@@ -31,12 +31,24 @@
   ansible.builtin.set_fact:
     _cf_schema_present: "{{ (_cf_schema.stdout | default('') | trim) == 't' }}"
 
-# TODO: check whether initial_setup in the pinned version accepts --noinput.
-# If it does, drop the stdin pipe.
+# STATICFILES_DIRS includes coldfront/static/bundles, which holds the built
+# Vite manifest.json. Until collectstatic runs, Django's system check warns
+# that the manifest is missing from STATIC_ROOT -- harmless, and resolved here.
+- name: Collect static assets
+  ansible.builtin.command:
+    cmd: "{{ _cf_app_dir }}/bin/manage collectstatic --noinput"
+  register: _cf_collectstatic
+  changed_when: "'0 static files copied' not in _cf_collectstatic.stdout"
+
+# initial_setup prompts via input() unless --force_overwrite is given. The shim
+# runs `podman run` without -i, so stdin is not forwarded to the container and
+# the prompt would hit EOF. Use the flag rather than piping stdin.
+# It runs: migrate, import_field_of_science_data, add_default_grant_options,
+# add_default_project_choices, add_resource_defaults, add_allocation_defaults,
+# add_default_publication_sources, add_scheduled_tasks.
 - name: Initialise the ColdFront database
   ansible.builtin.command:
-    cmd: "{{ _cf_app_dir }}/bin/manage initial_setup"
-    stdin: "yes\n"
+    cmd: "{{ _cf_app_dir }}/bin/manage initial_setup --force_overwrite"
   when: not _cf_schema_present
 
 - name: Apply migrations
@@ -60,9 +72,3 @@
     - _cf_superuser.rc != 0
     - "'already taken' not in (_cf_superuser.stderr | default(''))"
     - "'already exists' not in (_cf_superuser.stderr | default(''))"
-
-- name: Collect static assets
-  ansible.builtin.command:
-    cmd: "{{ _cf_app_dir }}/bin/manage collectstatic --noinput"
-  register: _cf_collectstatic
-  changed_when: "'0 static files copied' not in _cf_collectstatic.stdout"
