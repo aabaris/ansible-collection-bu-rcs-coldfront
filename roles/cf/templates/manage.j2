@@ -1,0 +1,28 @@
+#!/bin/bash
+# Managed by bu_rcs.coldfront -- do not edit.
+# The single seam every later layer uses to talk to ColdFront.
+#   {{ _cf_app_dir }}/bin/manage <coldfront subcommand> [args]
+# Optional: CF_SECRET_EXTRA="name,type=env,target=VAR" for bootstrap-only
+# secrets that the long-running containers deliberately do not carry.
+set -euo pipefail
+
+exec podman run --rm \
+  --network {{ cf_network }} \
+{% for e in _cf_app_config_env %}
+  -e {{ e }} \
+{% endfor %}
+{% for s in _cf_secrets_mount %}
+  --secret {{ cf_prefix }}{{ s.key }},target={{ s.value.target }} \
+{% endfor %}
+{% for s in _cf_secrets_env %}
+  --secret {{ cf_prefix }}{{ s.key }},type=env,target={{ s.value.target }} \
+{% endfor %}
+  ${CF_SECRET_EXTRA:+--secret "$CF_SECRET_EXTRA"} \
+{% for v in _cf_app_config_volumes %}
+  -v {{ v }} \
+{% endfor %}
+  -v {{ _cf_app_dir }}/etc/initializer.d:/etc/coldfront/initializer.d:z,ro \
+  -v {{ _cf_app_dir }}/static:/srv/coldfront/static:z \
+  -v {{ _cf_app_dir }}/site/templates:/usr/share/coldfront/site/templates:z,ro \
+  -v {{ _cf_app_dir }}/site/static:/usr/share/coldfront/site/static:z,ro \
+  {{ _cf_image_ref }} coldfront "$@"

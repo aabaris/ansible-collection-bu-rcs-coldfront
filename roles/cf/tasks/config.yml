@@ -1,0 +1,160 @@
+---
+# Steps 3-6. Everything lives under /srv; nothing in /usr/local.
+
+- name: Create per-component directory trees
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - "{{ _cf_app_dir }}"
+    - "{{ _cf_app_dir }}/etc"
+    - "{{ _cf_app_dir }}/etc/env.d"
+    - "{{ _cf_app_dir }}/etc/local_settings.d"
+    - "{{ _cf_app_dir }}/etc/initializer.d"
+    - "{{ _cf_app_dir }}/bin"
+    - "{{ _cf_app_dir }}/static"
+    - "{{ _cf_app_dir }}/site/templates"
+    - "{{ _cf_app_dir }}/site/static"
+    - "{{ _cf_db_dir }}"
+    - "{{ _cf_db_dir }}/etc"
+    - "{{ _cf_db_dir }}/data"
+    - "{{ _cf_redis_dir }}"
+    - "{{ _cf_redis_dir }}/etc"
+    - "{{ _cf_redis_dir }}/data"
+    - "{{ _cf_web_dir }}"
+    - "{{ _cf_web_dir }}/etc"
+
+# --- env.d fragments -------------------------------------------------------
+# 00 base (this role) / 20 auth / 40 plugins / 60 scheduler / 90 inventory.
+# Later files win, so the numbering is the precedence order.
+
+- name: Render base env fragment
+  ansible.builtin.template:
+    src: env.d/00-base.env.j2
+    dest: "{{ _cf_app_dir }}/etc/env.d/00-base.env"
+    owner: root
+    group: root
+    mode: "0640"
+  register: _cf_env_base
+
+- name: Render auth env fragment
+  ansible.builtin.template:
+    src: env.d/20-auth.env.j2
+    dest: "{{ _cf_app_dir }}/etc/env.d/20-auth.env"
+    owner: root
+    group: root
+    mode: "0640"
+  register: _cf_env_auth
+
+- name: Render inventory override env fragment
+  ansible.builtin.copy:
+    content: |
+      {% for k, v in cf_env_extra.items() %}
+      {{ k }}={{ v }}
+      {% endfor %}
+    dest: "{{ _cf_app_dir }}/etc/env.d/90-local.env"
+    owner: root
+    group: root
+    mode: "0640"
+  register: _cf_env_local
+
+- name: Assemble env file
+  ansible.builtin.assemble:
+    src: "{{ _cf_app_dir }}/etc/env.d"
+    dest: "{{ _cf_app_dir }}/etc/coldfront.env"
+    owner: root
+    group: root
+    mode: "0640"
+    delimiter: "\n"
+  register: _cf_env_assembled
+
+# --- local_settings.d fragments -------------------------------------------
+
+- name: Render base local_settings fragment
+  ansible.builtin.template:
+    src: local_settings.d/00-base.py.j2
+    dest: "{{ _cf_app_dir }}/etc/local_settings.d/00-base.py"
+    owner: root
+    group: root
+    mode: "0640"
+  register: _cf_ls_base
+
+- name: Render inventory override local_settings fragment
+  ansible.builtin.copy:
+    content: "{{ cf_local_settings_extra }}\n"
+    dest: "{{ _cf_app_dir }}/etc/local_settings.d/90-local.py"
+    owner: root
+    group: root
+    mode: "0640"
+  register: _cf_ls_local
+
+- name: Assemble local_settings.py
+  ansible.builtin.assemble:
+    src: "{{ _cf_app_dir }}/etc/local_settings.d"
+    dest: "{{ _cf_app_dir }}/etc/local_settings.py"
+    owner: root
+    group: root
+    mode: "0640"
+    delimiter: "\n"
+  register: _cf_ls_assembled
+
+# --- supporting config ----------------------------------------------------
+
+# --- local_urls.py (optional) ---------------------------------------------
+# Only written and mounted when there is content: an empty URL module may or
+# may not be safe for ColdFront to load, and a missing bind-mount source
+# becomes a directory. One file, no fragment dir -- nothing else contributes.
+
+- name: Write local_urls.py
+  ansible.builtin.copy:
+    content: |
+      # Managed by bu_rcs.coldfront -- do not edit.
+      {{ cf_local_urls_extra }}
+    dest: "{{ _cf_app_dir }}/etc/local_urls.py"
+    owner: root
+    group: root
+    mode: "0640"
+  when: _cf_local_urls_enabled | bool
+  register: _cf_urls_assembled
+
+- name: Remove local_urls.py when disabled
+  ansible.builtin.file:
+    path: "{{ _cf_app_dir }}/etc/local_urls.py"
+    state: absent
+  when: not (_cf_local_urls_enabled | bool)
+
+- name: Stage initializer data files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ _cf_app_dir }}/etc/initializer.d/{{ item | basename }}"
+    owner: root
+    group: root
+    mode: "0640"
+  loop: "{{ cf_initializer_files }}"
+
+- name: Render nginx config
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ _cf_web_dir }}/etc/nginx.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: _cf_nginx_conf
+
+- name: Install manage shim
+  ansible.builtin.template:
+    src: manage.j2
+    dest: "{{ _cf_app_dir }}/bin/manage"
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Record whether app configuration changed
+  ansible.builtin.set_fact:
+    _cf_app_config_changed: "{{ (_cf_env_assembled is changed)
+                                or (_cf_ls_assembled is changed)
+                                or (_cf_urls_assembled is changed) }}"
+    _cf_web_config_changed: "{{ _cf_nginx_conf is changed }}"

@@ -1,0 +1,33 @@
+---
+# Steps 13-14.
+#
+# Unconfigured behaviour is deliberately "use whatever defaults ColdFront
+# ships" -- initial_setup and add_resource_defaults have already run, so a
+# fresh instance has a usable resource taxonomy without any site input.
+#
+# Site customisation is opt-in: drop YAML files into cf_initializer_files and
+# they are staged to /etc/coldfront/initializer.d in the container and applied
+# via the coldfront-initializer plugin.
+
+- name: Apply initializer data
+  when: cf_initializer_files | length > 0
+  block:
+    # TODO: confirm the management command name and YAML schema against
+    # github.com/coldfront/coldfront-initializer before relying on this.
+    # Also confirm the plugin is present in the image -- if it is not, this
+    # fails here and you need an image that carries it.
+    - name: Load initializer YAML
+      ansible.builtin.command:
+        cmd: >-
+          {{ _cf_app_dir }}/bin/manage initialize
+          /etc/coldfront/initializer.d/{{ item | basename }}
+      loop: "{{ cf_initializer_files }}"
+      register: _cf_initializer
+      changed_when: true
+
+- name: Note that no site taxonomy was applied
+  ansible.builtin.debug:
+    msg: >-
+      No cf_initializer_files set; {{ cf_instance }} is using ColdFront's
+      shipped defaults. Add YAML files as site taxonomy gets developed.
+  when: cf_initializer_files | length == 0

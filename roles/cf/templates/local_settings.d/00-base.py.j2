@@ -1,0 +1,59 @@
+# Managed by bu_rcs.coldfront -- do not edit. Fragment 00-base.
+from pathlib import Path
+
+
+def _secret(name):
+    """Read a podman secret mounted into this container."""
+    return Path("/run/secrets", name).read_text().strip()
+
+{% set delivered = _cf_secrets_mount | map(attribute='key') | list %}
+{% if 'secret_key' in delivered %}
+SECRET_KEY = _secret("{{ cf_secrets.secret_key.target }}")
+{% endif %}
+
+# Database. The password comes from a mounted secret rather than being embedded
+# in DB_URL, so it appears in no env file, no unit, and no `podman inspect`.
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "{{ cf_db_name }}",
+        "USER": "{{ cf_db_user }}",
+        "PASSWORD": _secret("{{ cf_secrets.db_password.target }}"),
+        "HOST": "{{ _cf_db_host_effective }}",
+        "PORT": "{{ cf_db_port }}",
+    },
+}
+{% if 'oidc_client_secret' in delivered %}
+
+OIDC_RP_CLIENT_SECRET = _secret("{{ cf_secrets.oidc_client_secret.target }}")
+{% endif %}
+{% if 'ldap_bind_password' in delivered %}
+
+AUTH_LDAP_BIND_PASSWORD = _secret("{{ cf_secrets.ldap_bind_password.target }}")
+{% endif %}
+{% if cf_base_path %}
+
+# Subpath serving. Multiple instances on one hostname are the same origin,
+# so cookies MUST be path-scoped or logging into one clobbers the other.
+SESSION_COOKIE_PATH = "{{ cf_base_path }}"
+CSRF_COOKIE_PATH = "{{ cf_base_path }}"
+{% endif %}
+{% if cf_external_origin %}
+CSRF_TRUSTED_ORIGINS = ["{{ cf_external_origin }}"]
+{% endif %}
+
+# Behind nginx, behind Apache. Trust the forwarded scheme and host.
+# verify.yml greps diffsettings for USE_X_FORWARDED_HOST to prove this file
+# was actually loaded.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+{% if cf_auth_method == 'oidc' %}
+
+# mozilla_django_oidc stores state in an anonymous session during login.
+SESSION_COOKIE_SAMESITE = "Lax"
+{% endif %}
+{% if cf_auth_method == 'remote_user' %}
+
+MIDDLEWARE = list(MIDDLEWARE) + ["django.contrib.auth.middleware.RemoteUserMiddleware"]
+EXTRA_AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.RemoteUserBackend"]
+{% endif %}

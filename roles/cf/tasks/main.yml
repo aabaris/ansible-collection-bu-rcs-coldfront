@@ -1,0 +1,45 @@
+---
+# Steps map to the agreed 15-step sequence; see README.
+# No handlers: this role is included once per instance in a loop, and Ansible
+# handler names are global, so notify from instance 2 would collide with
+# instance 1. Restarts are explicit tasks gated on registered change facts.
+
+- name: Validate instance configuration
+  ansible.builtin.import_tasks: assert.yml
+  tags: [always]
+
+- name: Prepare container host                       # step 1
+  ansible.builtin.import_tasks: host.yml
+  tags: [host]
+
+- name: Resolve and verify image                     # step 2
+  ansible.builtin.import_tasks: image.yml
+  tags: [image]
+
+- name: Ensure secrets exist                         # step 2.5
+  ansible.builtin.import_tasks: secrets.yml
+  tags: [secrets]
+
+- name: Render configuration                         # steps 3-6
+  ansible.builtin.import_tasks: config.yml
+  tags: [config]
+
+- name: Deploy container stack                       # steps 7-9, 12
+  ansible.builtin.import_tasks: stack.yml
+  tags: [stack]
+
+- name: Bootstrap database                           # steps 10-11
+  ansible.builtin.import_tasks: bootstrap.yml
+  tags: [bootstrap]
+
+- name: Start application services                   # step 12
+  ansible.builtin.import_tasks: start_app.yml
+  tags: [stack]
+
+- name: Load instance data                           # steps 13-14
+  ansible.builtin.import_tasks: data.yml
+  tags: [data]
+
+- name: Verify                                       # step 15
+  ansible.builtin.import_tasks: verify.yml
+  tags: [verify]

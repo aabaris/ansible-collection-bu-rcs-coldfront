@@ -1,0 +1,160 @@
+---
+# Derived. Do not override these from inventory; override the defaults instead.
+
+cf_prefix: "{{ cf_instance }}-cf-"
+cf_network: "{{ cf_instance }}-cf"
+
+_cf_app_dir: "/srv/{{ cf_prefix }}app"
+_cf_db_dir: "/srv/{{ cf_prefix }}db"
+_cf_redis_dir: "/srv/{{ cf_prefix }}redis"
+_cf_web_dir: "/srv/{{ cf_prefix }}web"
+
+_cf_image_ref: >-
+  {{ cf_image ~ '@' ~ cf_image_digest if cf_image_digest | length > 0
+     else cf_image ~ ':' ~ cf_tag }}
+_cf_quadlet_dir: /etc/containers/systemd
+
+_cf_db_host_effective: "{{ cf_db_host | default('', true) or (cf_prefix ~ 'db') }}"
+_cf_redis_host_effective: "{{ cf_redis_host | default('', true) or (cf_prefix ~ 'redis') }}"
+
+# ---------------------------------------------------------------------------
+# Secrets
+#
+# Podman secret names carry the instance prefix so instances never clash on a
+# shared host. Mount targets are deliberately NOT prefixed: each container has
+# its own /run/secrets, so in-container paths stay instance-independent and
+# local_settings.py needs no templating of secret paths.
+# ---------------------------------------------------------------------------
+
+# Secrets in play for the configured auth method.
+_cf_secrets_active: >-
+  {{ (cf_secrets | dict2items | rejectattr('value.when_auth', 'defined') | list)
+     + (cf_secrets | dict2items | selectattr('value.when_auth', 'defined')
+        | selectattr('value.when_auth', 'equalto', cf_auth_method) | list) }}
+
+# Split by delivery so templates can format each kind without loops in vars.
+_cf_secrets_mount: >-
+  {{ _cf_secrets_active | rejectattr('value.bootstrap_only', 'defined')
+     | selectattr('value.type', 'equalto', 'mount') | list }}
+_cf_secrets_env: >-
+  {{ _cf_secrets_active | rejectattr('value.bootstrap_only', 'defined')
+     | selectattr('value.type', 'equalto', 'env') | list }}
+
+_cf_secret_db: "{{ cf_prefix }}db_password"
+_cf_secret_superuser: "{{ cf_prefix }}superuser_password"
+
+# ---------------------------------------------------------------------------
+# Config delivery
+#
+# COLDFRONT_ENV must be a real environment variable -- it is how ColdFront
+# finds the env file. COLDFRONT_CONFIG and COLDFRONT_URLS either live inside
+# that env file or are promoted alongside it.
+# ---------------------------------------------------------------------------
+_cf_local_urls_enabled: "{{ cf_local_urls_extra | trim | length > 0 }}"
+
+_cf_ct_env: /etc/coldfront/coldfront.env
+_cf_ct_config: /etc/coldfront/local_settings.py
+_cf_ct_urls: /etc/coldfront/local_urls.py
+
+# A dict, because podman_container's `env` parameter is type=dict.
+_cf_app_config_env: >-
+  {{ {'COLDFRONT_ENV': _cf_ct_env}
+     | combine({} if cf_pointer_delivery == 'env_file' else
+               {'COLDFRONT_CONFIG': _cf_ct_config})
+     | combine({'COLDFRONT_URLS': _cf_ct_urls}
+               if (cf_pointer_delivery != 'env_file' and _cf_local_urls_enabled | bool) else {}) }}
+
+_cf_app_config_volumes: >-
+  {{ [_cf_app_dir ~ '/etc/coldfront.env:' ~ _cf_ct_env ~ ':z,ro',
+      _cf_app_dir ~ '/etc/local_settings.py:' ~ _cf_ct_config ~ ':z,ro']
+     + ([_cf_app_dir ~ '/etc/local_urls.py:' ~ _cf_ct_urls ~ ':z,ro']
+        if _cf_local_urls_enabled | bool else []) }}
+
+# Quadlet section blocks. Each list element is one complete section, because
+# podman_container routes quadlet_options lines individually: a line starting
+# with '[' opens an extra section, anything else lands in [Container].
+_cf_unit_service: |-
+  [Service]
+  Restart=always
+  RestartSec=5
+  TimeoutStartSec=300
+_cf_unit_install: |-
+  [Install]
+  WantedBy=multi-user.target
+_cf_unit_after_data: |-
+  [Unit]
+  After={{ cf_prefix }}db.service {{ cf_prefix }}redis.service
+  Wants={{ cf_prefix }}db.service {{ cf_prefix }}redis.service
+_cf_unit_after_app: |-
+  [Unit]
+  After={{ cf_prefix }}app.service
+  Wants={{ cf_prefix }}app.service
+
+# ---------------------------------------------------------------------------
+# Service table. Drives directories, quadlets and restarts uniformly so
+# adding a service is a list entry, not a new template.
+#
+# app_secrets: true means "attach every non-bootstrap secret for this auth
+# method"; secrets_raw is for services needing a specific secret only.
+# ---------------------------------------------------------------------------
+cf_services:
+  - name: db
+    enabled: "{{ cf_db_managed | bool }}"
+    image: "{{ cf_db_image }}"
+    environment:
+      POSTGRES_DB: "{{ cf_db_name }}"
+      POSTGRES_USER: "{{ cf_db_user }}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets_raw:
+      - "{{ _cf_secret_db }},target=db_password"
+    volumes:
+      - "{{ _cf_db_dir }}/data:/var/lib/postgresql/data:z,U"
+    publish: []
+    exec: ""
+    quadlet_options: ["{{ _cf_unit_service }}", "{{ _cf_unit_install }}"]
+
+  - name: redis
+    enabled: "{{ cf_redis_managed | bool }}"
+    image: "{{ cf_redis_image }}"
+    environment: {}
+    volumes:
+      - "{{ _cf_redis_dir }}/data:/data:z,U"
+    publish: []
+    exec: "redis-server --appendonly yes"
+    quadlet_options: ["{{ _cf_unit_service }}", "{{ _cf_unit_install }}"]
+
+  - name: app
+    enabled: true
+    image: "{{ _cf_image_ref }}"
+    environment: "{{ _cf_app_config_env }}"
+    app_secrets: true
+    volumes: "{{ _cf_app_config_volumes + [
+        _cf_app_dir ~ '/static:/srv/coldfront/static:z',
+        _cf_app_dir ~ '/site/templates:/usr/share/coldfront/site/templates:z,ro',
+        _cf_app_dir ~ '/site/static:/usr/share/coldfront/site/static:z,ro'] }}"
+    publish: []
+    exec: "gunicorn --workers {{ cf_gunicorn_workers }} --bind 0.0.0.0:8000 coldfront.config.wsgi"
+    quadlet_options: ["{{ _cf_unit_after_data }}", "{{ _cf_unit_service }}", "{{ _cf_unit_install }}"]
+
+  - name: worker
+    enabled: true
+    image: "{{ _cf_image_ref }}"
+    environment: "{{ _cf_app_config_env }}"
+    app_secrets: true
+    volumes: "{{ _cf_app_config_volumes + [
+        _cf_app_dir ~ '/site/templates:/usr/share/coldfront/site/templates:z,ro'] }}"
+    publish: []
+    exec: "coldfront qcluster"
+    quadlet_options: ["{{ _cf_unit_after_data }}", "{{ _cf_unit_service }}", "{{ _cf_unit_install }}"]
+
+  - name: web
+    enabled: true
+    image: "{{ cf_web_image }}"
+    environment: {}
+    volumes:
+      - "{{ _cf_web_dir }}/etc/nginx.conf:/etc/nginx/conf.d/default.conf:z,ro"
+      - "{{ _cf_app_dir }}/static:/srv/coldfront/static:z,ro"
+    publish:
+      - "{{ cf_publish_address }}:{{ cf_publish_port }}:8080"
+    exec: ""
+    quadlet_options: ["{{ _cf_unit_after_app }}", "{{ _cf_unit_service }}", "{{ _cf_unit_install }}"]

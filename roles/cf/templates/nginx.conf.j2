@@ -1,0 +1,22 @@
+# Managed by bu_rcs.coldfront -- do not edit.
+server {
+    listen 8080;
+    server_name _;
+    client_max_body_size 25m;
+
+    location {{ cf_base_path }}/static/ {
+        alias /srv/coldfront/static/;
+        access_log off;
+        expires 1h;
+    }
+
+    location {{ cf_base_path }}/ {
+        proxy_pass http://{{ cf_prefix }}app:8000{{ cf_base_path }}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Host $http_x_forwarded_host;
+        proxy_redirect off;
+    }
+}

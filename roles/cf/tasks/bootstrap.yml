@@ -1,0 +1,68 @@
+---
+# Steps 10-11. Gated on database state, never on a marker file, so a restored
+# or rebuilt database is detected correctly.
+
+- name: Check whether the ColdFront schema exists
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - --rm
+      - --network
+      - "{{ cf_network }}"
+      - --secret
+      - "{{ _cf_secret_db }},type=env,target=PGPASSWORD"
+      - "{{ cf_db_image }}"
+      - psql
+      - -h
+      - "{{ _cf_db_host_effective }}"
+      - -p
+      - "{{ cf_db_port }}"
+      - -U
+      - "{{ cf_db_user }}"
+      - -d
+      - "{{ cf_db_name }}"
+      - -tAc
+      - "SELECT to_regclass('public.django_migrations') IS NOT NULL"
+  register: _cf_schema
+  changed_when: false
+
+- name: Set schema state fact
+  ansible.builtin.set_fact:
+    _cf_schema_present: "{{ (_cf_schema.stdout | default('') | trim) == 't' }}"
+
+# TODO: check whether initial_setup in the pinned version accepts --noinput.
+# If it does, drop the stdin pipe.
+- name: Initialise the ColdFront database
+  ansible.builtin.command:
+    cmd: "{{ _cf_app_dir }}/bin/manage initial_setup"
+    stdin: "yes\n"
+  when: not _cf_schema_present
+
+- name: Apply migrations
+  ansible.builtin.command:
+    cmd: "{{ _cf_app_dir }}/bin/manage migrate --noinput"
+  register: _cf_migrate
+  changed_when: "'No migrations to apply' not in _cf_migrate.stdout"
+  when: _cf_schema_present
+
+- name: Create superuser
+  ansible.builtin.command:
+    cmd: >-
+      {{ _cf_app_dir }}/bin/manage createsuperuser --noinput
+      --username {{ cf_superuser_name }}
+      --email {{ cf_superuser_email }}
+  environment:
+    CF_SECRET_EXTRA: "{{ _cf_secret_superuser }},type=env,target=DJANGO_SUPERUSER_PASSWORD"
+  register: _cf_superuser
+  changed_when: _cf_superuser.rc == 0
+  failed_when:
+    - _cf_superuser.rc != 0
+    - "'already taken' not in (_cf_superuser.stderr | default(''))"
+    - "'already exists' not in (_cf_superuser.stderr | default(''))"
+
+- name: Collect static assets
+  ansible.builtin.command:
+    cmd: "{{ _cf_app_dir }}/bin/manage collectstatic --noinput"
+  register: _cf_collectstatic
+  changed_when: "'0 static files copied' not in _cf_collectstatic.stdout"

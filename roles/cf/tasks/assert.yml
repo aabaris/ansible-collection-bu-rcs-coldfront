@@ -1,0 +1,42 @@
+---
+# Secrets are generate-once podman secrets, so nothing is required here.
+# Setting cf_secret_key / cf_db_password / cf_superuser_password only seeds
+# the secret on first creation.
+- name: Instance name is safe for container, unit and path names
+  ansible.builtin.assert:
+    that:
+      - cf_instance is match('^[a-z0-9][a-z0-9-]{0,30}$')
+    fail_msg: "cf_instance must be lowercase alnum/dash."
+    quiet: true
+
+- name: Django-Q timeout is below retry
+  ansible.builtin.assert:
+    that:
+      - (cf_q_cluster_timeout | int) < (cf_q_cluster_retry | int)
+    fail_msg: "cf_q_cluster_timeout must be less than cf_q_cluster_retry."
+    quiet: true
+
+- name: OIDC configuration is complete
+  ansible.builtin.assert:
+    that:
+      - cf_oidc_client_id | length > 0
+      - cf_oidc_base | length > 0
+    fail_msg: "cf_auth_method=oidc requires cf_oidc_client_id and cf_oidc_base."
+    quiet: true
+  when: cf_auth_method == 'oidc'
+
+- name: LDAP configuration is complete
+  ansible.builtin.assert:
+    that:
+      - cf_ldap_uri | length > 0
+      - cf_ldap_user_base | length > 0
+    fail_msg: "LDAP auth or user search requires cf_ldap_uri and cf_ldap_user_base."
+    quiet: true
+  when: cf_auth_method == 'ldap' or cf_user_search == 'ldap'
+
+- name: Base path is absolute and unslashed
+  ansible.builtin.assert:
+    that:
+      - cf_base_path == "" or (cf_base_path is match('^/[A-Za-z0-9._~-]+$'))
+    fail_msg: "cf_base_path must look like /coldfront1 (no trailing slash)."
+    quiet: true

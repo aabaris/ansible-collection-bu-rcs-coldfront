@@ -1,0 +1,7 @@
+---
+# Consume this collection the same way as nerc.netbox: git source, pinned.
+collections:
+  - name: bu_rcs.coldfront
+    type: git
+    version: main
+    source: https://github.com/aabaris/ansible-collection-bu-rcs-coldfront

@@ -1,0 +1,42 @@
+---
+# No capability introspection. Configure the right image, or find out from the
+# container logs -- a slim image missing a plugin fails at import with a clear
+# ImportError in `journalctl -u <inst>-cf-app`.
+#
+# The one guard worth keeping: upstream image tags do not track PyPI releases,
+# so when cf_expected_version is set we check the image actually contains it.
+
+- name: Pull ColdFront image
+  containers.podman.podman_image:
+    name: "{{ _cf_image_ref }}"
+    pull: true
+    force: false
+  when: cf_image_pull | bool
+
+- name: Read installed ColdFront version from the image
+  ansible.builtin.command:
+    argv: [podman, run, --rm, --entrypoint, "", "{{ _cf_image_ref }}", pip, show, coldfront]
+  register: _cf_image_version
+  changed_when: false
+  when: cf_expected_version | length > 0
+
+- name: Assert the image contains the expected ColdFront version
+  ansible.builtin.assert:
+    that:
+      - >-
+        ("Version: " ~ cf_expected_version) in (_cf_image_version.stdout | default(''))
+    fail_msg: >-
+      {{ _cf_image_ref }} does not contain ColdFront {{ cf_expected_version }}.
+      Upstream image tags do not track PyPI releases -- pin cf_image_digest.
+    quiet: true
+  when: cf_expected_version | length > 0
+
+- name: Pull supporting images
+  containers.podman.podman_image:
+    name: "{{ item }}"
+    pull: true
+    force: false
+  loop: "{{ ([cf_db_image] if cf_db_managed | bool else [])
+            + ([cf_redis_image] if cf_redis_managed | bool else [])
+            + [cf_web_image] }}"
+  when: cf_image_pull | bool

@@ -1,0 +1,167 @@
+---
+# ---------------------------------------------------------------------------
+# Identity. One role invocation == one instance.
+# ---------------------------------------------------------------------------
+cf_instance: "{{ inventory_hostname_short }}"
+
+# ---------------------------------------------------------------------------
+# Image. Defaults to the upstream image, which is already "fat" -- it ships
+# everything needed for any plugin/database configuration. A locally built
+# image (extending upstream) becomes the default only once we need a plugin
+# or binary upstream does not carry.
+#
+# Upstream image tags do NOT track PyPI releases, so prefer pinning by digest.
+# Tags: https://hub.docker.com/r/ubccr/coldfront/tags
+# ---------------------------------------------------------------------------
+cf_image: docker.io/ubccr/coldfront
+cf_tag: "latest"
+cf_image_digest: ""            # sha256:... -- wins over cf_tag when set
+cf_image_pull: true
+cf_expected_version: ""        # e.g. 1.1.9 -- asserted against the image if set.
+                               # This is the only image check: pin the right
+                               # image, or find out from the container logs.
+
+# ---------------------------------------------------------------------------
+# Capability seams. These drive both env fragments and the image assertion.
+# ---------------------------------------------------------------------------
+cf_auth_method: local        # local | ldap | oidc | remote_user
+cf_user_search: none         # none | ldap | keycloak
+
+# OIDC (required when cf_auth_method == oidc). The client *secret* is a podman
+# secret, seeded from cf_oidc_client_secret above.
+cf_oidc_client_id: ""
+cf_oidc_base: ""             # e.g. https://kc.bu.edu/realms/bu/protocol/openid-connect
+
+# LDAP (required when cf_auth_method == ldap or cf_user_search == ldap). The
+# bind password is a podman secret, seeded from cf_ldap_bind_password above.
+cf_ldap_uri: ""
+cf_ldap_user_base: ""
+cf_ldap_bind_dn: ""
+
+# ---------------------------------------------------------------------------
+# Exposure. 127.0.0.1 works over an ssh -L tunnel; set to the VM's reachable
+# address when the external Apache needs to ProxyPass to it.
+# ---------------------------------------------------------------------------
+cf_publish_address: 127.0.0.1
+cf_publish_port: 8101
+cf_base_path: ""             # e.g. /coldfront1 when served as a subdir
+cf_external_origin: ""       # e.g. https://server -- for CSRF_TRUSTED_ORIGINS
+
+# ---------------------------------------------------------------------------
+# Postgres. managed=true builds a container per instance (default).
+# managed=false hooks into an existing server via the params below.
+# ---------------------------------------------------------------------------
+cf_db_managed: true
+cf_db_image: docker.io/library/postgres:16
+cf_db_host: ""               # defaults to the managed container name
+cf_db_port: 5432
+cf_db_name: "{{ cf_instance }}"
+cf_db_user: "{{ cf_instance }}"
+cf_db_password: ""           # optional seed; blank => generated once as a podman secret
+
+# ---------------------------------------------------------------------------
+# Redis. Same switch shape as postgres.
+# ---------------------------------------------------------------------------
+cf_redis_managed: true
+cf_redis_image: docker.io/library/redis:7
+cf_redis_host: ""            # defaults to the managed container name
+cf_redis_port: 6379
+
+# ---------------------------------------------------------------------------
+# In-VM HTTP front. Serves static/ and proxies to gunicorn so the stack is
+# usable through a tunnel and the external Apache only needs one ProxyPass.
+# ---------------------------------------------------------------------------
+cf_web_image: docker.io/library/nginx:1.27-alpine
+
+# ---------------------------------------------------------------------------
+# App runtime
+# ---------------------------------------------------------------------------
+cf_gunicorn_workers: 3
+cf_secret_key: ""            # optional seed; blank => generated once as a podman secret
+cf_center_name: "BU Research Computing"
+cf_timezone: America/New_York
+cf_q_cluster_retry: 120
+cf_q_cluster_timeout: 90     # MUST be < retry
+
+cf_superuser_name: cfadmin
+cf_superuser_email: "rcs-coldfront@bu.edu"
+cf_superuser_password: ""    # optional seed; blank => generated once as a podman secret
+
+# Non-prod rails. Flip in group_vars/nonprod.
+cf_nonprod: false
+cf_dev_email_list: ""
+
+# ---------------------------------------------------------------------------
+# Secrets. Held as podman secrets, never in the env file or unit environment.
+#
+# Generate-once semantics: if the secret does not exist it is created, seeded
+# from the matching cf_*_password / cf_secret_key variable when one is set and
+# from openssl rand otherwise. If it already exists it is left alone, so an
+# unconfigured dev instance comes up immediately and re-running the same repo
+# never rotates a working password.
+#
+# To rotate deliberately:
+#   podman secret rm <inst>-cf-db_password && re-run
+# To read a generated value (dev convenience):
+#   podman secret inspect --showsecret <inst>-cf-superuser_password
+# ---------------------------------------------------------------------------
+cf_secrets_generate: true
+
+# Seeds. Blank means "generate on first create".
+cf_oidc_client_secret: ""
+cf_ldap_bind_password: ""
+
+# Delivery per secret. Prefer 'mount': the value lands at
+# /run/secrets/<target> and local_settings.py reads it, so it never enters
+# any process environment. Use 'env' only where the consumer has no file
+# interface -- currently just createsuperuser.
+#
+# when_auth restricts a secret to one auth method.
+# bootstrap_only keeps it off the long-running containers entirely.
+cf_secrets:
+  secret_key:
+    type: mount
+    target: secret_key
+  db_password:
+    type: mount
+    target: db_password
+  oidc_client_secret:
+    type: mount
+    target: oidc_client_secret
+    when_auth: oidc
+  ldap_bind_password:
+    type: mount
+    target: ldap_bind_password
+    when_auth: ldap
+  superuser_password:
+    type: env
+    target: DJANGO_SUPERUSER_PASSWORD
+    bootstrap_only: true
+
+# ---------------------------------------------------------------------------
+# Initializer data. Empty means "use whatever defaults ColdFront ships", which
+# is the right unconfigured behaviour. Add YAML files here as site taxonomy
+# gets developed; requires the coldfront-initializer plugin in the image.
+# ---------------------------------------------------------------------------
+cf_initializer_files: []     # paths on the control node, applied in order
+
+# ---------------------------------------------------------------------------
+# Config pointer delivery.
+#
+# COLDFRONT_ENV is always a real container environment variable -- it has to
+# be, it is how ColdFront finds the env file at all. The other two pointers
+# can live inside that env file (env_file, the default) or be promoted to real
+# environment variables (environment) if it turns out ColdFront resolves them
+# before loading the env file. verify.yml catches that case.
+# ---------------------------------------------------------------------------
+cf_pointer_delivery: env_file   # env_file | environment
+
+# URL overrides via local_urls.py / COLDFRONT_URLS. Left empty by default:
+# the file is not rendered, not mounted, and the pointer is not set, because
+# an empty urls module may or may not be safe to load. Set this (or have a
+# plugin contribute a fragment) to enable it.
+cf_local_urls_extra: ""
+
+# Free-form escape hatches, applied last.
+cf_env_extra: {}
+cf_local_settings_extra: ""

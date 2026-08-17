@@ -1,0 +1,28 @@
+---
+# Step 15. Definition of done: reachable and styled, not merely running.
+
+- name: All expected units are active
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ cf_prefix }}{{ item }}.service"]
+  loop: "{{ cf_services | selectattr('enabled') | map(attribute='name') | list }}"
+  register: _cf_units_active
+  changed_when: false
+
+- name: Settings load cleanly
+  ansible.builtin.command:
+    cmd: "{{ _cf_app_dir }}/bin/manage diffsettings"
+  register: _cf_diffsettings
+  changed_when: false
+
+# Proves local_settings.py was actually loaded. If cf_pointer_delivery is
+# env_file and ColdFront resolves COLDFRONT_CONFIG before reading the env
+# file, this is where it shows up -- switch to cf_pointer_delivery=environment.
+- name: local_settings.py took effect
+  ansible.builtin.assert:
+    that:
+      - "'USE_X_FORWARDED_HOST' in _cf_diffsettings.stdout"
+    fail_msg: >-
+      local_settings.py did not load. With cf_pointer_delivery=env_file the
+      COLDFRONT_CONFIG pointer lives inside the env file; if ColdFront resolves
+      it earlier than that, set cf_pointer_delivery=environment.
+    quiet: true

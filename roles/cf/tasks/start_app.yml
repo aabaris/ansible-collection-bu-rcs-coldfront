@@ -1,0 +1,23 @@
+---
+# Step 12. Split from stack.yml so bootstrap runs against a live DB but
+# before gunicorn serves traffic.
+
+- name: Start application services
+  ansible.builtin.systemd_service:
+    name: "{{ cf_prefix }}{{ item }}.service"
+    state: started
+    enabled: true
+  loop: [app, worker, web]
+
+- name: Restart app and worker on configuration change
+  ansible.builtin.systemd_service:
+    name: "{{ cf_prefix }}{{ item }}.service"
+    state: restarted
+  loop: [app, worker]
+  when: _cf_app_config_changed | bool
+
+- name: Restart web on configuration change
+  ansible.builtin.systemd_service:
+    name: "{{ cf_prefix }}web.service"
+    state: restarted
+  when: _cf_web_config_changed | bool

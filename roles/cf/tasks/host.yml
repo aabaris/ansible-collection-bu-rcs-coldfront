@@ -1,0 +1,6 @@
+---
+# Idempotent; only does work once per VM even though the role runs per stack.
+- name: Install container tooling
+  ansible.builtin.package:
+    name: podman
+    state: present
