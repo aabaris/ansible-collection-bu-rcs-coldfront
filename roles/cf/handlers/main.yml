@@ -3,4 +3,5 @@
   ansible.builtin.systemd:
     name: "{{ cf_web_name }}"
     daemon_reload: true
+    state: restarted
   when: not ansible_check_mode
