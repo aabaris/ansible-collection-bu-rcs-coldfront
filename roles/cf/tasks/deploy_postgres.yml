@@ -1,14 +1,10 @@
 ---
-- name: Create Coldfront top level directories
+- name: Create Coldfront Postgres to level directories
   ansible.builtin.file:
-    path: "{{ cf_dir }}/{{ item.dir }}"
+    path: "{{ cf_db_dir }}/{{ item.dir }}"
     state: directory
     owner: "{{ item.owner | default('root') }}"
     group: "{{ item.group | default('root') }}"
     mode: "{{ item.mode | default('0755') }}"
   loop:
     - { dir:  "" }
-
-- name: Create Postgresdatabase for Coldfront
-  import_tasks: deploy_postgres.yml
-  when: cf_db_managed is true

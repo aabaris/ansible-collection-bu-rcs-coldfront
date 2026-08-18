@@ -1,8 +1,19 @@
 cf_instance: 'rcs'
 cf_prefix: '/srv'
-cf_dir: "{{ cf_prefix }}/{{ cf_instance }}-app"
+cf_app_name: "{{ cf_instance }}-cf-app"
+cf_dir: "{{ cf_prefix }}/{{ cf_app_name }}"
 cf_image: 'docker.io/ubccr/coldfront:latest'
 cf_bind_host: '127.0.0.1'
 cf_bind_port: '8000'
 cf_timezone: local
 cf_network: "{{ cf_instance }}-cf-net"
+
+# database
+cf_db_managed: true
+cf_db_image: docker.io.library/postgres:16
+cf_db_name: "{{ cf_instance }}-cf-pgsql"
+cf_db_dir: "{{ cf_prefix }}/{{ cf_db_name }}"
+cf_db_host: "{{ cf_db_name }}"
+cf_db_dbname: "coldfront"
+cf_db_user: "{{ cf_instnace }}"
+cf_db_password: ""
