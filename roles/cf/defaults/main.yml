@@ -1,4 +1,5 @@
 cf_instance: 'rcs'
+cf_site_name: 'BU RCS'
 cf_prefix: '/srv'
 cf_app_name: "{{ cf_instance }}-cf-app"
 cf_workers_name: "{{ cf_instance }}-cf-workers"
@@ -18,16 +19,17 @@ cf_web_bind_port: '80'
 
 # database
 cf_db_managed: true
-cf_db_image: docker.io.library/postgres:16
+cf_db_image: 'docker.io/library/postgres:16'
 cf_db_name: "{{ cf_instance }}-cf-pgsql"
 cf_db_dir: "{{ cf_prefix }}/{{ cf_db_name }}"
 cf_db_host: "{{ cf_db_name }}"
 cf_db_dbname: "coldfront"
-cf_db_user: "{{ cf_instnace }}"
+cf_db_user: "{{ cf_instance }}"
 cf_db_password: ""
 
 # redis
 cf_redis_managed: true
 cf_redis_name: "{{ cf_instance }}-cf-redis"
+cf_redis_dir: "{{ cf_prefix }}/{{ cf_redis_name }}"
 cf_redis_image: docker.io/library/redis:7
 cf_redis_host: "{{ cf_redis_name }}"

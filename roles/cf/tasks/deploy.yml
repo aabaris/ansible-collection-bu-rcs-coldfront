@@ -7,7 +7,8 @@
     group: "{{ item.group | default('root') }}"
     mode: "{{ item.mode | default('0755') }}"
   loop:
-    - { dir:  "" }
+    - { dir: "" }
+    - { dir: "static" }
 
 - name: Create Coldfront webserver top level directories
   ansible.builtin.file:
@@ -17,19 +18,24 @@
     group: "{{ item.group | default('root') }}"
     mode: "{{ item.mode | default('0755') }}"
   loop:
-    - { dir:  "" }
+    - { dir: "" }
 
 - name: Create Coldfront instance network
   containers.podman.podman_network:
     name: "{{ cf_network }}"
     state: present
 
+- name: Handle Coldfront Postgres password
+  ansible.builtin.include_tasks: secret.yml
+  vars:
+    cf_secret_key: cf_db_password
+
 - name: Create Postgres database for Coldfront
-  import_tasks: deploy_postgres.yml
+  ansible.builtin.import_tasks: deploy_postgres.yml
   when: cf_db_managed is true
 
 - name: Create Redis server for Coldfront
-  import_tasks: deploy_redis.yml
+  ansible.builtin.import_tasks: deploy_redis.yml
   when: cf_redis_managed is true
 
 - name: Create Coldfront webserver container
@@ -39,6 +45,8 @@
     network: "{{ cf_network }}"
     publish: "{{ cf_web_bind_host }}:80:{{ cf_web_bind_port }}"
     timezone: "{{ cf_timezone }}"
+    volumes:
+      - "{{ cf_dir }}/static:/srv/coldfront/static:ro,z"
     state: quadlet
     quadlet_filename: "{{ cf_web_name }}"
     quadlet_options:
@@ -46,6 +54,39 @@
         [Install]
         WantedBy=default.target
   notify: Restart Coldfront webserver
+
+- name: Install Coldfront config files
+  ansible.builtin.template:
+    src: "{{ item.file }}.j2"
+    dest: "{{ cf_dir }}/{{ item.file }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0640') }}"
+  loop:
+    - { file: "coldfront_settings.py" }
+    - { file: "coldfront.env" }
+  notify: Restart Coldfront server
+
+- name: Create Coldfront app container
+  containers.podman.podman_container:
+    name: "{{ cf_app_name }}"
+    image: "{{ cf_image }}"
+    network: "{{ cf_network }}"
+    publish: "{{ cf_bind_host }}:8000:{{ cf_bind_port }}"
+    timezone: "{{ cf_timezone }}"
+    env_file: "{{ cf_dir }}/coldfront.env"
+    secrets:
+      - "{{ cf_instance }}_cf_db_password,type=mount,target=/run/secrets/cf_db_password"
+    volumes:
+      - "{{ cf_dir }}/coldfront_settings.py:/etc/coldfront_settings.py:ro,Z"
+      - "{{ cf_dir }}/static:/static:rw,z"
+    state: quadlet
+    quadlet_filename: "{{ cf_app_name }}"
+    quadlet_options:
+      - |
+        [Install]
+        WantedBy=default.target
+  notify: Restart Coldfront server
 
 - name: Enable Coldfront systemd services
   ansible.builtin.systemd:
@@ -55,3 +96,4 @@
   when: not ansible_check_mode
   loop:
     - "{{ cf_web_name }}"
+    - "{{ cf_app_name }}"

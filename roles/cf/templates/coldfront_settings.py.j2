@@ -1,0 +1,15 @@
+with open("/var/run/secrets/cf_db_password", "r") as file:
+    cf_db_password = file.read().strip()
+
+CENTER_NAME = "{{ cf_site_name }}"
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': '{{ cf_db_dbname }}',
+        'USER': '{{ cf_db_user }}',
+        'HOST': '{{ cf_db_name }}',
+        'PORT': '{{ cf_db_port | default("5432") }}',
+        'PASSWORD': cf_db_password
+    }
+}
