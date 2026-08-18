@@ -28,7 +28,7 @@
 - name: Handle Coldfront Postgres password
   ansible.builtin.include_tasks: secret.yml
   vars:
-    cf_secret_key: cf_db_password
+    cf_secret_var: cf_db_password
 
 - name: Create Postgres database for Coldfront
   ansible.builtin.import_tasks: deploy_postgres.yml
