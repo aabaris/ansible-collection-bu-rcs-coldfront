@@ -1,0 +1,6 @@
+--
+- name: Restart Coldfront webserver
+  ansible.builtin.systemd:
+    name: "{{ cf_web_name }}"
+    daemon_reload: true
+  when: not ansible_check_mode

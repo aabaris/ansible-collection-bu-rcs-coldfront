@@ -1,3 +1,4 @@
+*.swp
 *.tar.gz
 *.retry
 __pycache__/

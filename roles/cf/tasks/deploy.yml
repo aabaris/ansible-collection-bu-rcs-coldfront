@@ -9,6 +9,49 @@
   loop:
     - { dir:  "" }
 
-- name: Create Postgresdatabase for Coldfront
+- name: Create Coldfront webserver top level directories
+  ansible.builtin.file:
+    path: "{{ cf_web_dir }}/{{ item.dir }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - { dir:  "" }
+
+- name: Create Coldfront instance network
+  containers.podman.podman_network:
+    name: "{{ cf_network }}"
+    state: present
+
+- name: Create Postgres database for Coldfront
   import_tasks: deploy_postgres.yml
   when: cf_db_managed is true
+
+- name: Create Redis server for Coldfront
+  import_tasks: deploy_redis.yml
+  when: cf_redis_managed is true
+
+- name: Create Coldfront webserver container
+  containers.podman.podman_container:
+    name: "{{ cf_web_name }}"
+    image: "{{ cf_web_image }}"
+    network: "{{ cf_network }}"
+    publish: "{{ cf_web_bind_host }}:80:{{ cf_web_bind_port }}"
+    timezone: "{{ cf_timezone }}"
+    state: quadlet
+    quadlet_filename: "{{ cf_web_name }}"
+    quadlet_options:
+      - |
+        [Install]
+        WantedBy=default.target
+  notify: Restart Coldfront webserver
+
+- name: Enable Coldfront systemd services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    daemon_reload: true
+    enabled: true
+  when: not ansible_check_mode
+  loop:
+    - "{{ cf_web_name }}"
