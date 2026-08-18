@@ -9,6 +9,7 @@ cf_bind_host: '0.0.0.0'
 cf_bind_port: '8000'
 cf_timezone: local
 cf_network: "{{ cf_instance }}-cf-net"
+cf_base_path: "coldfront-dev"
 
 # web server
 cf_web_name: "{{ cf_instance }}-cf-web"

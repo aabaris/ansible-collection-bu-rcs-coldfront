@@ -13,3 +13,7 @@ DATABASES = {
         'PASSWORD': cf_db_password
     }
 }
+
+{% set bp = cf_base_path | default('', true) | trim('/') %}
+SESSION_COOKIE_PATH = "{{ '/' ~ bp if bp else '/' }}"
+CSRF_COOKIE_PATH = "{{ '/' ~ bp if bp else '/' }}"
