@@ -46,7 +46,7 @@
     publish: "{{ cf_web_bind_host }}:{{ cf_web_bind_port }}:80"
     timezone: "{{ cf_timezone }}"
     volumes:
-      - "{{ cf_dir }}/static:/srv/coldfront/static:ro,z"
+      - "{{ cf_dir }}/static:/usr/share/nginx/html:ro,z"
     state: quadlet
     quadlet_filename: "{{ cf_web_name }}"
     quadlet_options:
