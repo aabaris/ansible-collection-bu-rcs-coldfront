@@ -17,3 +17,7 @@ DATABASES = {
 {% set bp = cf_base_path | default('', true) | trim('/') %}
 SESSION_COOKIE_PATH = "{{ '/' ~ bp if bp else '/' }}"
 CSRF_COOKIE_PATH = "{{ '/' ~ bp if bp else '/' }}"
+
+#SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+#USE_X_FORWARDED_HOST = True
+#CSRF_TRUSTED_ORIGINS=https://server
