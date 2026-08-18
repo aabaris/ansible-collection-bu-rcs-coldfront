@@ -1,0 +1,8 @@
+cf_instance: 'rcs'
+cf_prefix: '/srv'
+cf_dir: "{{ cf_prefix }}/{{ cf_instance }}-app"
+cf_image: 'docker.io/ubccr/coldfront:latest'
+cf_bind_host: '127.0.0.1'
+cf_bind_port: '8000'
+cf_timezone: local
+cf_network: "{{ cf_instance }}-cf-net"
