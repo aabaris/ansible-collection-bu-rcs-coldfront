@@ -1,6 +1,9 @@
 with open("/var/run/secrets/cf_db_password", "r") as file:
     cf_db_password = file.read().strip()
 
+with open("/run/secrets/{{ cf_instance }}_cf_secret_key", "r") as file:
+    SECRET_KEY = file.read().strip()
+
 CENTER_NAME = "{{ cf_site_name }}"
 
 DATABASES = {

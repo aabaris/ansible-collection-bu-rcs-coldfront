@@ -11,6 +11,7 @@ cf_timezone: local
 cf_network: "{{ cf_instance }}-cf-net"
 cf_base_path: "coldfront-dev"
 cf_public_host: "cloud.bu.edu"
+cf_secret_key: ""
 
 # web server
 cf_web_name: "{{ cf_instance }}-cf-web"

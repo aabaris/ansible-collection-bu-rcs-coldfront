@@ -30,6 +30,10 @@
   vars:
     cf_secret_var: cf_db_password
 
+- ansible.builtin.include_tasks: secret.yml
+  vars:
+    cf_secret_var: cf_secret_key
+
 - name: Create Postgres database for Coldfront
   ansible.builtin.import_tasks: deploy_postgres.yml
   when: cf_db_managed is true
@@ -77,6 +81,7 @@
     env_file: "{{ cf_dir }}/coldfront.env"
     secrets:
       - "{{ cf_instance }}_cf_db_password,type=mount,target=/run/secrets/cf_db_password"
+      - "{{ cf_instance }}_cf_secret_key,type=mount,target=/run/secrets/cf_secret_key"
     volumes:
       - "{{ cf_dir }}/coldfront_settings.py:/etc/coldfront_settings.py:ro,Z"
       - "{{ cf_dir }}/static:/static:rw,z"
