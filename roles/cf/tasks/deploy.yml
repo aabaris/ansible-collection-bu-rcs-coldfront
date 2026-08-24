@@ -73,7 +73,9 @@
   loop:
     - { file: "coldfront_settings.py" }
     - { file: "coldfront.env" }
-  notify: Restart Coldfront server
+  notify:
+    - Restart Coldfront server
+    - Restart Coldfront worker
 
 - name: Create Coldfront app container
   containers.podman.podman_container:
@@ -107,6 +109,41 @@
         WantedBy=default.target
   notify: Restart Coldfront server
 
+- name: Create Coldfront worker container
+  containers.podman.podman_container:
+    name: "{{ cf_workers_name }}"
+    image: "{{ cf_image }}"
+    network: "{{ cf_network }}"
+    timezone: "{{ cf_timezone }}"
+    command: "coldfront qcluster"
+    env_file: "{{ cf_dir }}/coldfront.env"
+    secrets:
+      - "{{ cf_instance }}_cf_db_password,\
+         type=mount,target=/run/secrets/cf_db_password"
+      - "{{ cf_instance }}_cf_secret_key,\
+         type=mount,target=/run/secrets/cf_secret_key"
+      - "{{ cf_instance }}_cf_redis_password,\
+         type=mount,target=/run/secrets/cf_redis_password"
+    volumes:
+      - "{{ cf_dir }}/coldfront_settings.py:/etc/coldfront_settings.py:ro,Z"
+    state: quadlet
+    quadlet_filename: "{{ cf_workers_name }}"
+    quadlet_options:
+      - |
+        [Unit]
+        {% if cf_db_managed | bool %}
+        After={{ cf_db_name }}.service
+        Wants={{ cf_db_name }}.service
+        {% endif %}
+        {% if cf_redis_managed | bool %}
+        After={{ cf_redis_name }}.service
+        Wants={{ cf_redis_name }}.service
+        {% endif %}
+      - |
+        [Install]
+        WantedBy=default.target
+  notify: Restart Coldfront worker
+
 - name: Enable Coldfront systemd services
   ansible.builtin.systemd:
     name: "{{ item }}"
@@ -117,3 +154,5 @@
   loop:
     - "{{ cf_web_name }}"
     - "{{ cf_app_name }}"
+    - "{{ cf_workers_name }}"
+
