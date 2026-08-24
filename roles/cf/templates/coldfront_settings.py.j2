@@ -25,7 +25,7 @@ Q_CLUSTER = {
     "workers": {{ cf_q_workers | default(2) }},
     "redis": {
         "host": "{{ cf_redis_host }}",
-         port": {{ cf_redis_port | default(6379, true) | int }},
+        "port": {{ cf_redis_port | default(6379, true) | int }},
         "db": 0,
         "password": cf_redis_password,
     },
