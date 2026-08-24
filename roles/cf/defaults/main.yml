@@ -12,6 +12,7 @@ cf_network: "{{ cf_instance }}-cf-net"
 cf_base_path: "coldfront-dev"
 cf_public_host: "cloud.bu.edu"
 cf_secret_key: ""
+cf_q_workers: 2
 
 # web server
 cf_web_name: "{{ cf_instance }}-cf-web"
@@ -36,4 +37,5 @@ cf_redis_name: "{{ cf_instance }}-cf-redis"
 cf_redis_dir: "{{ cf_prefix }}/{{ cf_redis_name }}"
 cf_redis_image: docker.io/library/redis:7
 cf_redis_host: "{{ cf_redis_name }}"
+cf_redis_port: '6379'
 cf_redis_password: ""

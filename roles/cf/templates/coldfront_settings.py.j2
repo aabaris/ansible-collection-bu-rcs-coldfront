@@ -4,6 +4,9 @@ with open("/var/run/secrets/cf_db_password", "r") as file:
 with open("/run/secrets/cf_secret_key", "r") as file:
     SECRET_KEY = file.read().strip()
 
+with open("/run/secrets/cf_redis_password") as file:
+    cf_redis_password = file.read().strip()
+
 CENTER_NAME = "{{ cf_site_name }}"
 
 DATABASES = {
@@ -15,6 +18,17 @@ DATABASES = {
         'PORT': '{{ cf_db_port | default("5432") }}',
         'PASSWORD': cf_db_password
     }
+}
+
+Q_CLUSTER = {
+    **Q_CLUSTER,
+    "workers": {{ cf_q_workers | default(2) }},
+    "redis": {
+        "host": "{{ cf_redis_host }}",
+         port": {{ cf_redis_port | default(6379, true) | int }},
+        "db": 0,
+        "password": cf_redis_password,
+    },
 }
 
 {% set bp = cf_base_path | default('', true) | trim('/') %}
