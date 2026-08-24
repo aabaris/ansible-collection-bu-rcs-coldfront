@@ -179,5 +179,6 @@
     group: root
     mode: '0750'
   loop:
+    - init.sh
     - backup.sh
     - restore.sh
