@@ -104,6 +104,10 @@
         After={{ cf_db_name }}.service
         Wants={{ cf_db_name }}.service
         {% endif %}
+        {% if cf_redis_managed | bool %}
+        After={{ cf_redis_name }}.service
+        Wants={{ cf_redis_name }}.service
+        {% endif %}
       - |
         [Install]
         WantedBy=default.target

@@ -1,4 +1,4 @@
-with open("/var/run/secrets/cf_db_password", "r") as file:
+with open("/run/secrets/cf_db_password", "r") as file:
     cf_db_password = file.read().strip()
 
 with open("/run/secrets/cf_secret_key", "r") as file:

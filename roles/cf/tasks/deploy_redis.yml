@@ -36,16 +36,6 @@
     quadlet_filename: "{{ cf_redis_name }}"
     quadlet_options:
       - |
-        [Unit]
-        {% if cf_db_managed | bool %}
-        After={{ cf_db_name }}.service
-        Wants={{ cf_db_name }}.service
-        {% endif %}
-        {% if cf_redis_managed | bool %}
-        After={{ cf_redis_name }}.service
-        Wants={{ cf_redis_name }}.service
-        {% endif %}
-      - |
         [Install]
         WantedBy=default.target
   notify: Restart Coldfront redis
