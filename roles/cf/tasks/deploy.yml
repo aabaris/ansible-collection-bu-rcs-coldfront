@@ -93,7 +93,7 @@
       - "{{ cf_instance }}_cf_redis_password,\
          type=mount,target=/run/secrets/cf_redis_password"
     volumes:
-      - "{{ cf_dir }}/coldfront_settings.py:/etc/coldfront_settings.py:ro,Z"
+      - "{{ cf_dir }}/coldfront_settings.py:/etc/coldfront_settings.py:ro,z"
       - "{{ cf_dir }}/static:/static:rw,z"
     state: quadlet
     quadlet_filename: "{{ cf_app_name }}"
@@ -125,7 +125,7 @@
       - "{{ cf_instance }}_cf_redis_password,\
          type=mount,target=/run/secrets/cf_redis_password"
     volumes:
-      - "{{ cf_dir }}/coldfront_settings.py:/etc/coldfront_settings.py:ro,Z"
+      - "{{ cf_dir }}/coldfront_settings.py:/etc/coldfront_settings.py:ro,z"
     state: quadlet
     quadlet_filename: "{{ cf_workers_name }}"
     quadlet_options:
