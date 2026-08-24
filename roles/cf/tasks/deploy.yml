@@ -34,6 +34,10 @@
   vars:
     cf_secret_var: cf_secret_key
 
+- ansible.builtin.include_tasks: secret.yml
+  vars:
+    cf_secret_var: cf_redis_password
+
 - name: Create Postgres database for Coldfront
   ansible.builtin.import_tasks: deploy_postgres.yml
   when: cf_db_managed | bool

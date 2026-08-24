@@ -36,3 +36,4 @@ cf_redis_name: "{{ cf_instance }}-cf-redis"
 cf_redis_dir: "{{ cf_prefix }}/{{ cf_redis_name }}"
 cf_redis_image: docker.io/library/redis:7
 cf_redis_host: "{{ cf_redis_name }}"
+cf_redis_password: ""
