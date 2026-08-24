@@ -36,11 +36,11 @@
 
 - name: Create Postgres database for Coldfront
   ansible.builtin.import_tasks: deploy_postgres.yml
-  when: cf_db_managed is true
+  when: cf_db_managed | bool
 
 - name: Create Redis server for Coldfront
   ansible.builtin.import_tasks: deploy_redis.yml
-  when: cf_redis_managed is true
+  when: cf_redis_managed | bool
 
 - name: Create Coldfront webserver container
   containers.podman.podman_container:
@@ -98,6 +98,7 @@
     name: "{{ item }}"
     daemon_reload: true
     enabled: true
+    state: started
   when: not ansible_check_mode
   loop:
     - "{{ cf_web_name }}"

@@ -34,6 +34,12 @@
     quadlet_filename: "{{ cf_db_name }}"
     quadlet_options:
       - |
+        [Unit]
+        {% if cf_db_managed | bool %}
+        After={{ cf_db_name }}.service
+        Wants={{ cf_db_name }}.service
+        {% endif %}
+      - |
         [Install]
         WantedBy=default.target
   notify: Restart Coldfront database
@@ -43,4 +49,5 @@
     name: "{{ cf_db_name }}"
     daemon_reload: true
     enabled: true
+    state: started
   when: not ansible_check_mode
