@@ -160,3 +160,24 @@
     - "{{ cf_app_name }}"
     - "{{ cf_workers_name }}"
 
+- name: Create Coldfront script and backup directories
+  ansible.builtin.file:
+    path: "{{ cf_dir }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  loop:
+    - bin
+    - backups
+
+- name: Install Coldfront operator scripts
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ cf_dir }}/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: '0750'
+  loop:
+    - backup.sh
+    - restore.sh
