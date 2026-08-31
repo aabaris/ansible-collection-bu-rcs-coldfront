@@ -73,6 +73,7 @@
     mode: "{{ item.mode | default('0640') }}"
   loop:
     - { file: "etc/coldfront_settings.py" }
+    - { file: "etc/cf_remote_user.py" }
     - { file: "coldfront.env" }
   notify:
     - Restart Coldfront server
