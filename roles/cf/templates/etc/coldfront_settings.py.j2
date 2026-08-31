@@ -38,3 +38,25 @@ CSRF_COOKIE_PATH = "{{ '/' ~ bp if bp else '/' }}"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 CSRF_TRUSTED_ORIGINS = ["https://{{ cf_public_host }}"]
+
+
+{% if cf_remote_user_header | default('', true) | length > 0 %}
+# REMOTE_USER authentication. Apache authenticates and passes the identity in
+# {{ cf_remote_user_header }}; see cf_remote_user.py.
+#
+# RemoteUserMiddleware must come after AuthenticationMiddleware, which sits at
+# index 4 of ColdFront's MIDDLEWARE, so appending is safe.
+MIDDLEWARE = [*MIDDLEWARE, "cf_remote_user.ShibRemoteUserMiddleware"]
+ 
+# Listed first so remote auth is tried before ModelBackend. ModelBackend stays
+# so the local superuser can still reach /admin.
+AUTHENTICATION_BACKENDS = [
+    "cf_remote_user.ShibRemoteUserBackend",
+    *AUTHENTICATION_BACKENDS,
+]
+ 
+# Django's logout clears its own session but not Apache's SP session, so
+# without this the next request silently re-authenticates and the user appears
+# never to log out.
+LOGOUT_REDIRECT_URL = "{{ cf_remote_logout_url }}"
+{% endif %}

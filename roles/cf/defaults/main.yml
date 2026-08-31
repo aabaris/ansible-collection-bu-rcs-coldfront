@@ -14,6 +14,19 @@ cf_public_host: "cloud.bu.edu"
 cf_secret_key: ""
 cf_q_workers: 2
 
+# Header Apache sets with the authenticated username. Empty disables
+# REMOTE_USER auth entirely and leaves ColdFront on local Django accounts.
+#cf_remote_user_header: ''
+cf_remote_user_header: X-Remote-User
+
+# Only meaningful when the above is set.
+cf_remote_email_header: X-Remote-Email
+cf_remote_first_header: X-Remote-Givenname
+cf_remote_last_header: X-Remote-Sn
+cf_remote_user_create: true          # false = pre-created accounts only
+cf_remote_user_strip_scope: true     # abaris@bu.edu -> abaris
+cf_remote_logout_url: '/Shibboleth.sso/Logout'
+
 # web server
 cf_web_name: "{{ cf_instance }}-cf-web"
 cf_web_image: docker.io/library/nginx:1.27-alpine
