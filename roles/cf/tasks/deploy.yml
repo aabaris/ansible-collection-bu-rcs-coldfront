@@ -109,7 +109,7 @@
     volumes:
       - "{{ cf_dir }}/etc:/etc/coldfront:ro,z"
       - "{{ cf_dir }}/static:/static:rw,z"
-       - "{{ cf_dir }}/site-templates:/etc/coldfront/site-templates:ro,z"
+      - "{{ cf_dir }}/site-templates:/etc/coldfront/site-templates:ro,z"
     state: quadlet
     quadlet_filename: "{{ cf_app_name }}"
     quadlet_options:
