@@ -13,6 +13,8 @@ cf_base_path: "coldfront-dev"
 cf_public_host: "cloud.bu.edu"
 cf_secret_key: ""
 cf_q_workers: 2
+cf_ldap_server_uri: ""
+cf_ldap_search_base: ""
 
 # Header Apache sets with the authenticated username. Empty disables
 # REMOTE_USER auth entirely and leaves ColdFront on local Django accounts.
