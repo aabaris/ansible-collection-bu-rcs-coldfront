@@ -21,6 +21,18 @@
   loop:
     - { dir: "" }
 
+- name: Install site template overrides
+  ansible.builtin.copy:
+    src: site_templates/
+    dest: "{{ cf_dir }}/site-templates/"
+    owner: root
+    group: root
+    mode: '0644'
+    directory_mode: '0755'
+  notify:
+    - Restart Coldfront server
+    - Restart Coldfront worker
+
 - name: Create Coldfront instance network
   containers.podman.podman_network:
     name: "{{ cf_network }}"
@@ -97,6 +109,7 @@
     volumes:
       - "{{ cf_dir }}/etc:/etc/coldfront:ro,z"
       - "{{ cf_dir }}/static:/static:rw,z"
+       - "{{ cf_dir }}/site-templates:/etc/coldfront/site-templates:ro,z"
     state: quadlet
     quadlet_filename: "{{ cf_app_name }}"
     quadlet_options:
