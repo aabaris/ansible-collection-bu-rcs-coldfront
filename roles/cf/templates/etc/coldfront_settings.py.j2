@@ -38,9 +38,8 @@ CSRF_COOKIE_PATH = "{{ '/' ~ bp if bp else '/' }}"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 CSRF_TRUSTED_ORIGINS = ["https://{{ cf_public_host }}"]
-
-
 {% if cf_remote_user_header | default('', true) | length > 0 %}
+
 # REMOTE_USER authentication. Apache authenticates and passes the identity in
 # {{ cf_remote_user_header }}; see cf_remote_user.py.
 #
@@ -60,3 +59,11 @@ AUTHENTICATION_BACKENDS = [
 # never to log out.
 LOGOUT_REDIRECT_URL = "{{ cf_remote_logout_url }}"
 {% endif %}
+{% if cf_env_label | default('', true) | length > 0 %}
+CF_ENV_LABEL = "{{ cf_env_label }}"
+CF_ENV_COLOR = "{{ cf_env_color | default('#b30000', true) }}"
+{% else %}
+CF_ENV_LABEL = ""
+CF_ENV_COLOR = ""
+{% endif %}
+SETTINGS_EXPORT = [*SETTINGS_EXPORT, "CF_ENV_LABEL", "CF_ENV_COLOR"]
