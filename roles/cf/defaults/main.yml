@@ -18,7 +18,7 @@ cf_ldap_search_base: ""
 
 # Header Apache sets with the authenticated username. Empty disables
 # REMOTE_USER auth entirely and leaves ColdFront on local Django accounts.
-#cf_remote_user_header: ''
+# cf_remote_user_header: ''
 cf_remote_user_header: X-Remote-User
 
 # Only meaningful when the above is set.

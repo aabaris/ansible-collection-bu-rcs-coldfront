@@ -43,11 +43,13 @@
   vars:
     cf_secret_var: cf_db_password
 
-- ansible.builtin.include_tasks: secret.yml
+- name: Handle cf key secret
+  ansible.builtin.include_tasks: secret.yml
   vars:
     cf_secret_var: cf_secret_key
 
-- ansible.builtin.include_tasks: secret.yml
+- name: Handle redis password
+  ansible.builtin.include_tasks: secret.yml
   vars:
     cf_secret_var: cf_redis_password
 
